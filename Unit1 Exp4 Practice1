@@ -1,0 +1,123 @@
+// employeeManager.js
+
+// 1. Import the readline module for interactive input
+const readline = require('readline');
+
+// 2. Initialize the employee data array (In-Memory Database)
+const employees = [];
+
+// 3. Configure the readline interface
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+// --- CORE FUNCTIONS ---
+
+/**
+ * Displays the main menu and prompts the user for a choice.
+ */
+function displayMenu() {
+    console.log('\n--- Employee Management System ---');
+    console.log('a. Add New Employee');
+    console.log('b. View All Employees');
+    console.log('c. Remove Employee by ID');
+    console.log('d. Exit');
+    
+    rl.question('Enter your choice (a-d): ', handleChoice);
+}
+
+// Action: a. Add New Employee
+function addEmployee() {
+    rl.question('Enter Employee Name: ', (name) => {
+        rl.question('Enter Employee ID: ', (id) => {
+            // Trim and validate input
+            const trimmedName = name.trim();
+            const trimmedId = id.trim();
+            
+            if (!trimmedName || !trimmedId) {
+                console.log('\n❌ Error: Name and ID cannot be empty.');
+                return displayMenu();
+            }
+
+            // Check if ID already exists
+            if (employees.some(emp => emp.id === trimmedId)) {
+                console.log(`\n❌ Error: Employee ID ${trimmedId} already exists.`);
+                return displayMenu();
+            }
+            
+            // Add the new employee object to the array
+            employees.push({ id: trimmedId, name: trimmedName });
+            console.log(`\n✅ Employee ${trimmedName} (ID: ${trimmedId}) added successfully.`);
+            displayMenu();
+        });
+    });
+}
+
+// Action: b. View All Employees
+function viewEmployees() {
+    console.log('\n--- Employee List ---');
+    if (employees.length === 0) {
+        console.log('The employee list is currently empty.');
+    } else {
+        // Display each employee
+        employees.forEach((emp, index) => {
+            console.log(`${index + 1}. ID: ${emp.id.padEnd(5)}, Name: ${emp.name}`);
+        });
+    }
+    displayMenu();
+}
+
+// Action: c. Remove Employee by ID
+function removeEmployee() {
+    rl.question('Enter Employee ID to remove: ', (idToRemove) => {
+        const trimmedId = idToRemove.trim();
+        
+        // Find the index of the employee to remove
+        const index = employees.findIndex(emp => emp.id === trimmedId);
+        
+        if (index > -1) {
+            // Use splice() to remove the employee at the found index
+            const removed = employees.splice(index, 1);
+            console.log(`\n✅ Employee ${removed[0].name} (ID: ${trimmedId}) removed.`);
+        } else {
+            console.log(`\n❌ Error: Employee with ID ${trimmedId} not found.`);
+        }
+        
+        displayMenu();
+    });
+}
+
+/**
+ * Routes the user's input to the corresponding function.
+ * @param {string} choice - The user's input from the menu.
+ */
+function handleChoice(choice) {
+    const normalizedChoice = choice.trim().toLowerCase();
+
+    switch (normalizedChoice) {
+        case 'a':
+            addEmployee();
+            break;
+        case 'b':
+            viewEmployees();
+            break;
+        case 'c':
+            removeEmployee();
+            break;
+        case 'd':
+            // Exit the application gracefully
+            console.log('\n👋 Exiting the Employee Management System. Goodbye!');
+            rl.close();
+            break;
+        default:
+            console.log('\n⚠️ Invalid choice. Please select a, b, c, or d.');
+            displayMenu();
+            break;
+    }
+}
+
+// --- EXECUTION START ---
+
+// Start the application by showing the menu
+displayMenu();
