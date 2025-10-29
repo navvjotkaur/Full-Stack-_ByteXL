@@ -1,0 +1,30 @@
+const mongoose = require('mongoose');
+
+// Define the Schema for a Student
+const StudentSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: [true, 'Student name is required'],
+        trim: true,
+    },
+    age: {
+        type: Number,
+        required: [true, 'Student age is required'],
+        min: [16, 'Student must be at least 16 years old'],
+    },
+    course: {
+        type: String,
+        required: [true, 'Course name is required'],
+        trim: true,
+    },
+    // Timestamp for when the document was created/updated
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    }
+});
+
+// Create the Model class from the Schema
+const Student = mongoose.model('Student', StudentSchema);
+
+module.exports = Student;
