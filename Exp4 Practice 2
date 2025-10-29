@@ -1,0 +1,149 @@
+// cardData.js
+
+// Initial in-memory data structure for the card collection
+let cards = [
+    { id: 1, suit: 'Hearts', value: 'Ace' },
+    { id: 2, suit: 'Spades', value: 'King' },
+    { id: 3, suit: 'Diamonds', value: 'Queen' },
+];
+
+// Simple counter to generate unique IDs
+let nextId = cards.length + 1;
+
+/**
+ * Generates a unique sequential ID for a new card.
+ * @returns {number} The next available ID.
+ */
+function generateId() {
+    return nextId++;
+}
+
+/**
+ * Retrieves all cards.
+ * @returns {Array} The full card collection.
+ */
+function getAllCards() {
+    return cards;
+}
+
+/**
+ * Adds a new card to the collection.
+ * @param {object} newCard - The card object to add (must have suit and value).
+ * @returns {object} The newly created card object with an assigned ID.
+ */
+function addCard(newCard) {
+    const card = {
+        id: generateId(),
+        suit: newCard.suit,
+        value: newCard.value
+    };
+    cards.push(card);
+    return card;
+}
+
+/**
+ * Finds a card by its ID.
+ * @param {string} id - The ID (as a string from req.params) of the card to find.
+ * @returns {object|undefined} The card object, or undefined if not found.
+ */
+function getCardById(id) {
+    // Convert ID parameter (which is a string) to a number for comparison
+    const cardId = parseInt(id);
+    return cards.find(card => card.id === cardId);
+}
+
+/**
+ * Deletes a card by its ID.
+ * @param {string} id - The ID (as a string from req.params) of the card to delete.
+ * @returns {object|null} The deleted card object, or null if not found.
+ */
+function deleteCard(id) {
+    const cardId = parseInt(id);
+    const index = cards.findIndex(card => card.id === cardId);
+
+    if (index > -1) {
+        // splice returns an array of the deleted elements; we take the first element [0]
+        const deletedCard = cards.splice(index, 1);
+        return deletedCard[0];
+    }
+    return null;
+}
+
+module.exports = {
+    getAllCards,
+    addCard,
+    getCardById,
+    deleteCard
+};
+
+// server.js
+
+const express = require('express');
+const bodyParser = require('body-parser'); 
+const data = require('./cardData'); // Import the data module
+
+const app = express();
+const PORT = 3000;
+
+// Middleware to parse incoming JSON payloads
+app.use(bodyParser.json()); 
+
+// --- RESTful API Endpoints ---
+
+// GET /cards: List all cards
+app.get('/cards', (req, res) => {
+    // 200 OK
+    res.status(200).json(data.getAllCards());
+});
+
+// GET /cards/:id: Retrieve a specific card
+app.get('/cards/:id', (req, res) => {
+    const card = data.getCardById(req.params.id);
+    
+    if (card) {
+        // 200 OK
+        res.status(200).json(card);
+    } else {
+        // 404 Not Found
+        res.status(404).json({ message: `Card with ID ${req.params.id} not found.` });
+    }
+});
+
+// POST /cards: Add a new card
+app.post('/cards', (req, res) => {
+    const { suit, value } = req.body;
+
+    // Basic Input validation
+    if (!suit || !value) {
+        // 400 Bad Request
+        return res.status(400).json({ 
+            message: 'Missing required properties: suit and value are required.',
+            example: { suit: 'Clubs', value: 'Ten' }
+        });
+    }
+    
+    const newCard = data.addCard({ suit, value });
+    
+    // 201 Created (Best practice for successful POST)
+    res.status(201).json(newCard);
+});
+
+// DELETE /cards/:id: Delete a card
+app.delete('/cards/:id', (req, res) => {
+    const deletedCard = data.deleteCard(req.params.id);
+
+    if (deletedCard) {
+        // 200 OK
+        res.status(200).json({ message: 'Card deleted successfully', card: deletedCard });
+    } else {
+        // 404 Not Found
+        res.status(404).json({ message: `Card with ID ${req.params.id} not found and could not be deleted.` });
+    }
+});
+
+// --- Server Start ---
+
+app.listen(PORT, () => {
+    console.log(`\n🎉 REST API Server is running on http://localhost:${PORT}`);
+    console.log('Endpoints: GET /cards, GET/DELETE /cards/:id, POST /cards');
+});
