@@ -1,0 +1,199 @@
+// bookingServer.js
+
+const express = require('express');
+const bodyParser = require('body-parser');
+
+const app = express();
+const PORT = 3000;
+
+// --- CONFIGURATION & DATA ---
+const LOCK_DURATION_MS = 60 * 1000; // 1 minute lock
+const TOTAL_SEATS = 20;
+
+// In-memory data store for seat status
+/* Example seat state:
+{
+    1: { status: 'available', lockedBy: null, lockExpiresAt: null },
+    2: { status: 'booked', lockedBy: null, lockExpiresAt: null },
+    ...
+}
+*/
+const seats = {};
+for (let i = 1; i <= TOTAL_SEATS; i++) {
+    seats[i] = {
+        status: 'available',  // 'available', 'locked', or 'booked'
+        lockedBy: null,       // User ID or session ID that holds the lock
+        lockExpiresAt: null,  // Timestamp when the lock should be released
+    };
+}
+
+// --- MIDDLEWARE ---
+app.use(bodyParser.json());
+
+// --- CORE LOGIC: LOCK MANAGEMENT ---
+
+/**
+ * Checks if a lock on a seat has expired and cleans up the state if necessary.
+ * @param {number} seatId 
+ */
+function cleanupExpiredLock(seatId) {
+    const seat = seats[seatId];
+    if (seat.status === 'locked' && seat.lockExpiresAt && Date.now() > seat.lockExpiresAt) {
+        console.log(`[CLEANUP] Lock expired for Seat ${seatId} held by ${seat.lockedBy}. Releasing lock.`);
+        seat.status = 'available';
+        seat.lockedBy = null;
+        seat.lockExpiresAt = null;
+        // You might want to notify the user whose lock expired in a real system
+        return true; // Lock was expired and cleaned up
+    }
+    return false; // Lock is still valid or seat is not locked
+}
+
+
+// --- API ENDPOINTS (RESTful Design) ---
+
+/**
+ * GET /seats
+ * Purpose: View the current status of all seats.
+ */
+app.get('/seats', (req, res) => {
+    // Before sending the state, ensure any expired locks are released
+    for (let id in seats) {
+        cleanupExpiredLock(id);
+    }
+
+    // Transform the internal seat structure into a client-friendly format
+    const seatStatus = Object.keys(seats).map(id => {
+        const seat = seats[id];
+        let displayStatus = seat.status;
+        
+        // Hide sensitive info like lockExpiresAt from the client
+        if (seat.status === 'locked') {
+            displayStatus = `locked (expires in ${Math.ceil((seat.lockExpiresAt - Date.now()) / 1000)}s)`;
+        }
+
+        return {
+            id: parseInt(id),
+            status: displayStatus,
+        };
+    });
+
+    res.status(200).json({ 
+        totalSeats: TOTAL_SEATS,
+        seats: seatStatus 
+    });
+});
+
+
+/**
+ * POST /lock
+ * Purpose: Attempt to lock an available seat for a user.
+ * Body: { seatId: number, userId: string }
+ */
+app.post('/lock', (req, res) => {
+    const { seatId, userId } = req.body;
+    const seat = seats[seatId];
+
+    if (!seat) {
+        return res.status(404).json({ message: 'Seat not found.' });
+    }
+
+    // 1. Check and cleanup any expired locks BEFORE proceeding
+    cleanupExpiredLock(seatId);
+
+    // 2. Race condition check
+    if (seat.status === 'booked') {
+        return res.status(409).json({ message: `Seat ${seatId} is already booked.` });
+    }
+
+    if (seat.status === 'locked') {
+        if (seat.lockedBy === userId) {
+            // User already holds the lock, refresh it
+            seat.lockExpiresAt = Date.now() + LOCK_DURATION_MS;
+            return res.status(200).json({ 
+                message: `Lock refreshed for Seat ${seatId}. Expires in ${LOCK_DURATION_MS / 1000} seconds.`, 
+                expires: seat.lockExpiresAt 
+            });
+        }
+        // Lock held by another user
+        return res.status(409).json({ message: `Seat ${seatId} is currently locked by another user.` });
+    }
+
+    // 3. Acquire the lock
+    seat.status = 'locked';
+    seat.lockedBy = userId;
+    seat.lockExpiresAt = Date.now() + LOCK_DURATION_MS;
+
+    res.status(200).json({ 
+        message: `Seat ${seatId} successfully locked. You have ${LOCK_DURATION_MS / 1000} seconds to confirm the booking.`,
+        expires: seat.lockExpiresAt 
+    });
+});
+
+
+/**
+ * POST /confirm
+ * Purpose: Confirm a booking on an already locked seat.
+ * Body: { seatId: number, userId: string }
+ */
+app.post('/confirm', (req, res) => {
+    const { seatId, userId } = req.body;
+    const seat = seats[seatId];
+
+    if (!seat) {
+        return res.status(404).json({ message: 'Seat not found.' });
+    }
+
+    // 1. Check and cleanup any expired locks
+    cleanupExpiredLock(seatId);
+
+    // 2. Check current status
+    if (seat.status === 'booked') {
+        return res.status(409).json({ message: `Seat ${seatId} is already permanently booked.` });
+    }
+
+    if (seat.status !== 'locked' || seat.lockedBy !== userId) {
+        // User does not hold a valid lock
+        return res.status(403).json({ message: `Seat ${seatId} is not currently locked by you or the lock has expired.` });
+    }
+
+    // 3. Confirm the booking (critical section)
+    seat.status = 'booked';
+    seat.lockedBy = null; // No need for lock info once booked
+    seat.lockExpiresAt = null;
+
+    res.status(200).json({ message: `✅ Booking confirmed for Seat ${seatId} by user ${userId}.` });
+});
+
+
+/**
+ * POST /release (Optional, but good practice for manual release)
+ * Purpose: Manually release a lock if the user decides not to book.
+ * Body: { seatId: number, userId: string }
+ */
+app.post('/release', (req, res) => {
+    const { seatId, userId } = req.body;
+    const seat = seats[seatId];
+
+    if (!seat) {
+        return res.status(404).json({ message: 'Seat not found.' });
+    }
+
+    // Only allow the user who holds the lock to release it
+    if (seat.status === 'locked' && seat.lockedBy === userId) {
+        seat.status = 'available';
+        seat.lockedBy = null;
+        seat.lockExpiresAt = null;
+        return res.status(200).json({ message: `Lock successfully released for Seat ${seatId}.` });
+    }
+
+    return res.status(403).json({ message: `Cannot release lock: Seat ${seatId} is either not locked or locked by another user.` });
+});
+
+
+// --- Server Start ---
+app.listen(PORT, () => {
+    console.log(`\n🎉 Ticket Booking Server running on http://localhost:${PORT}`);
+    console.log(`Lock duration is ${LOCK_DURATION_MS / 1000} seconds.`);
+    console.log('Available seats: 1 to 20');
+});
