@@ -1,0 +1,151 @@
+#html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Product Filter Website</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <h1>Product Filter</h1>
+
+  <!-- FILTER BAR -->
+  <div id="filter-bar">
+    <select id="category">
+      <option value="">All Categories</option>
+      <option value="Medicine">Medicine</option>
+      <option value="Home">Home</option>
+      <option value="Beauty">Beauty</option>
+    </select>
+
+    <select id="brand">
+      <option value="">All Brands</option>
+      <option value="Dabur">Dabur</option>
+      <option value="Himalaya">Himalaya</option>
+      <option value="Lakme">Lakme</option>
+    </select>
+
+    <select id="price">
+      <option value="">All Prices</option>
+      <option value="0-500">0 – 500</option>
+      <option value="500-1000">500 – 1000</option>
+      <option value="1000-5000">1000 – 5000</option>
+    </select>
+
+    <button onclick="filterProducts()">Apply</button>
+  </div>
+
+  <!-- PRODUCT LIST -->
+  <div id="product-list"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+#css
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Product Filter Website</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <h1>Product Filter</h1>
+
+  <!-- FILTER BAR -->
+  <div id="filter-bar">
+    <select id="category">
+      <option value="">All Categories</option>
+      <option value="Medicine">Medicine</option>
+      <option value="Home">Home</option>
+      <option value="Beauty">Beauty</option>
+    </select>
+
+    <select id="brand">
+      <option value="">All Brands</option>
+      <option value="Dabur">Dabur</option>
+      <option value="Himalaya">Himalaya</option>
+      <option value="Lakme">Lakme</option>
+    </select>
+
+    <select id="price">
+      <option value="">All Prices</option>
+      <option value="0-500">0 – 500</option>
+      <option value="500-1000">500 – 1000</option>
+      <option value="1000-5000">1000 – 5000</option>
+    </select>
+
+    <button onclick="filterProducts()">Apply</button>
+  </div>
+
+  <!-- PRODUCT LIST -->
+  <div id="product-list"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
+#script js
+// Sample product data
+const products = [
+  { name: "Pain Relief Tablet", category: "Medicine", brand: "Dabur", price: 120 },
+  { name: "Face Cream", category: "Beauty", brand: "Lakme", price: 499 },
+  { name: "Floor Cleaner", category: "Home", brand: "Himalaya", price: 250 },
+  { name: "Vitamin Syrup", category: "Medicine", brand: "Himalaya", price: 320 },
+  { name: "Hair Oil", category: "Beauty", brand: "Dabur", price: 150 },
+  { name: "Room Freshener", category: "Home", brand: "Dabur", price: 180 }
+];
+
+// Display all products initially
+window.onload = () => {
+  displayProducts(products);
+};
+
+function filterProducts() {
+  const category = document.getElementById("category").value;
+  const brand = document.getElementById("brand").value;
+  const price = document.getElementById("price").value;
+
+  let filtered = products;
+
+  if (category) {
+    filtered = filtered.filter(p => p.category === category);
+  }
+
+  if (brand) {
+    filtered = filtered.filter(p => p.brand === brand);
+  }
+
+  if (price) {
+    const [min, max] = price.split("-").map(Number);
+    filtered = filtered.filter(p => p.price >= min && p.price <= max);
+  }
+
+  displayProducts(filtered);
+}
+
+function displayProducts(list) {
+  const div = document.getElementById("product-list");
+  div.innerHTML = "";
+
+  if (list.length === 0) {
+    div.innerHTML = "<p>No products found.</p>";
+    return;
+  }
+
+  list.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <h3>${p.name}</h3>
+      <p>Category: ${p.category}</p>
+      <p>Brand: ${p.brand}</p>
+      <p>Price: ₹${p.price}</p>
+    `;
+
+    div.appendChild(card);
+  });
+}
